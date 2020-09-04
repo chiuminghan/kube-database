@@ -12,10 +12,12 @@ import (
     "k8s.io/client-go/tools/cache"
     "k8s.io/client-go/tools/record"
     "k8s.io/client-go/util/workqueue"
+    typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+
+    "k8s.io/apimachinery/pkg/util/wait"
+    utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
     corev1 "k8s.io/api/core/v1"
-    typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-    utilruntime "k8s.io/apimachinery/pkg/util/runtime"
     apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
     xscheme      "github.com/chiuminghan/kube-database/pkg/client/clientset/versioned/scheme"
@@ -75,6 +77,20 @@ func NewController() *Controller {
         workqueue:              workqueue,
     }
 
+    informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+        AddFunc: func(newObject interface{}) {
+            klog.Infof("Added: %v", newObject)
+        },
+        UpdateFunc: func(oldObject, newObject interface{}) {
+            klog.Infof("Updated: %v", newObject)
+        },
+        DeleteFunc: func(object interface{}) {
+            klog.Infof("Deleted: %v", object)
+        },
+    })
+
+    informerFactory.Start(wait.NeverStop)
+
    return c
 }
 
@@ -90,6 +106,7 @@ func (c *Controller) Run(){
         <-timeout.C
         timeoutCh <- struct{}{}
     }()
+
     if ok := cache.WaitForCacheSync(timeoutCh, c.informer.HasSynced); !ok {
         klog.Fatalln("Timeout expired during waiting for caches to sync.")
     }
